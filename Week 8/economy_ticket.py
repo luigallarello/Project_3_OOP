@@ -23,4 +23,5 @@ class EconomyTicket(Ticket):
 Ticket_1 = EconomyTicket(2325.22, 2)
 
 
-Ticket_1.calculate_price()
+print(Ticket_1.calculate_price())
+print(Ticket_1.baggage_allowance())
