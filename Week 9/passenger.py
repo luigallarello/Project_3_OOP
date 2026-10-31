@@ -1,4 +1,4 @@
-class Passenger():
+class Passenger:
     def __init__(self, name, email, passport_number):
         self.__name = name
         self.__email = email
@@ -31,8 +31,20 @@ class Passenger():
 
     passport_number = property(get_passport_number, set_passport_number)
 
-
     def equals(self, other):
         if not isinstance(other, Passenger):
             return False
+        # same passport means same person, even if they're separate objects
         return self.__passport_number == other.get_passport_number()
+
+    def __str__(self):
+        return (f'{self.__name} ({self.__email}), '
+                f'passport {self.__passport_number}')
+
+
+# quick test, only runs when this file is run directly
+if __name__ == '__main__':
+    passenger_1 = Passenger('Lui', 'lui@email.com', 'PA123456')
+    passenger_2 = Passenger('Lui G', 'other@email.com', 'PA123456')
+    print(passenger_1)
+    print(passenger_1.equals(passenger_2))

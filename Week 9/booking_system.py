@@ -1,12 +1,19 @@
-from flight import Flight
-from passenger import Passenger
-from booking import Booking
 import datetime
 
+from booking import Booking
+from flight import Flight
+from passenger import Passenger
 
-class BookingSystem ():
+# flights in these states can still take bookings
+_BOOKABLE_STATUSES = {'scheduled', 'delayed'}
+
+
+class BookingSystem:
     BOOKING_PREFIX = 'BK'
+
     def __init__(self):
+        # flights keyed by flight number, passengers by passport number,
+        # bookings by booking reference
         self.__flights = {}
         self.__bookings = {}
         self.__passengers = {}
@@ -20,15 +27,12 @@ class BookingSystem ():
         if isinstance(flight, Flight):
             self.__flights[flight.get_flight_number()] = flight
 
-
-
     def register_passenger(self, passenger):
         if isinstance(passenger, Passenger):
             self.__passengers[passenger.get_passport_number()] = passenger
 
-
     def create_booking(self, passengers, flight, ticket):
-        # Accept one passenger or a list of passengers
+        # lets you pass in a single passenger as well as a list
         if isinstance(passengers, Passenger):
             passengers = [passengers]
 
@@ -42,61 +46,97 @@ class BookingSystem ():
         if flight.get_flight_number() not in self.__flights:
             return None
 
-        # Can't book a flight that is cancelled or has already left
-        if flight.get_status() in ('cancelled', 'departed'):
+        if flight.get_status() not in _BOOKABLE_STATUSES:
             return None
 
-        # Not enough seats left for everyone on this booking
-        if self.seats_booked(flight) + len(passengers) > flight.get_capacity():
+        # make sure the whole group fits, not just one person
+        seats_left = flight.get_capacity() - self.seats_booked(flight)
+        if len(passengers) > seats_left:
             return None
 
+        # e.g. BK0001, BK0002...
         reference = f'{self.BOOKING_PREFIX}{self.__count:04d}'
         booking_date = str(datetime.date.today())
 
-        new_booking = Booking(reference, booking_date, passengers, flight, ticket)
+        new_booking = Booking(reference, booking_date, passengers,
+                              flight, ticket)
         self.__bookings[reference] = new_booking
 
         self.__count += 1
         return new_booking
 
-
     def seats_booked(self, flight):
-        # Count passengers on this flight, ignoring cancelled bookings
         total = 0
         for reference, booking in self.__bookings.items():
+            # cancelled bookings give their seats back
             if reference in self.__cancelled_bookings:
                 continue
-            if booking.get_flight().get_flight_number() == flight.get_flight_number():
+            booked_number = booking.get_flight().get_flight_number()
+            if booked_number == flight.get_flight_number():
                 total += len(booking.get_passengers())
         return total
 
-
     def cancel_booking(self, booking_reference):
-        # 1. booking_reference not a str -> return None (or raise TypeError).
+        if not isinstance(booking_reference, str):
+            return None
 
-        # 2. Look it up in self.__bookings (not self.__passengers).
-        #    Not found -> return None.
+        booking = self.__bookings.get(booking_reference)
+        if booking is None:
+            return None
 
-        # 3. Already in self.__cancelled_bookings -> return None.
-
-        # 4. Tell the booking to cancel itself: booking.cancel_booking()
-        #    (the Booking owns its own status).
-
-        # 5. Add booking_reference to self.__cancelled_bookings.
-
-        # 6. Return the cancelled booking.
-        pass
-
+        # The booking decides if it can be cancelled, for example not
+        # once the flight has departed. The system just keeps track.
+        if not booking.cancel_booking():
+            return None
+        self.__cancelled_bookings.add(booking_reference)
+        return booking
 
     def get_available_flights(self):
-        # 1. Loop over self.__flights.values().
+        available = []
+        for flight in self.__flights.values():
+            if flight.get_status() not in _BOOKABLE_STATUSES:
+                continue
+            # skip flights that are already full
+            if self.seats_booked(flight) < flight.get_capacity():
+                available.append(flight)
+        return available
 
-        # 2. Keep flights whose status is 'scheduled' or 'delayed'
-        #    (not 'cancelled' or 'departed').
+    def __str__(self):
+        return (f'Booking system: {len(self.__flights)} flight(s), '
+                f'{len(self.__passengers)} passenger(s), '
+                f'{len(self.__bookings)} booking(s), '
+                f'{len(self.__cancelled_bookings)} cancelled')
 
-        # 3. Return them as a list (UML says list[Flight], not the dict).
-        return list(self.__flights.values())
 
-    # Optional helpers (add to UML if you keep them):
-    # def find_booking(self, booking_reference) -> Booking | None
-    # def get_bookings_for_passenger(self, passport_number) -> list[Booking]
+# quick test, only runs when this file is run directly
+if __name__ == '__main__':
+    from economy_ticket import EconomyTicket
+
+    system = BookingSystem()
+    passenger_1 = Passenger('Lui', 'lui@email.com', 'PA123456')
+    passenger_2 = Passenger('Sam', 'sam@email.com', 'PB654321')
+    passenger_3 = Passenger('Alex', 'alex@email.com', 'PC111222')
+    small_flight = Flight('QF401', 'SYD', 'MEL', '10:00', 2, 'scheduled')
+    cancelled_flight = Flight('QF500', 'SYD', 'BNE', '12:00', 100,
+                              'cancelled')
+
+    for passenger in (passenger_1, passenger_2, passenger_3):
+        system.register_passenger(passenger)
+    system.add_flight(small_flight)
+    system.add_flight(cancelled_flight)
+    ticket_1 = EconomyTicket(250.0, 1)
+
+    # group booking fills the 2 seats
+    booking_1 = system.create_booking([passenger_1, passenger_2],
+                                      small_flight, ticket_1)
+    print(booking_1)
+
+    # flight is full and the other one is cancelled, so both give None
+    print(system.create_booking(passenger_3, small_flight, ticket_1))
+    print(system.create_booking(passenger_3, cancelled_flight, ticket_1))
+    print([str(f) for f in system.get_available_flights()])
+
+    # cancelling frees the seats back up
+    system.cancel_booking('BK0001')
+    print(system.create_booking(passenger_3, small_flight, ticket_1))
+    print(system)
