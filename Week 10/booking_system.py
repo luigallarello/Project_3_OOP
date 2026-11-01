@@ -20,9 +20,6 @@ class BookingSystem:
         self.__cancelled_bookings = set()
         self.__count = 1
 
-    def get_count(self):
-        return self.__count
-
     def add_flight(self, flight):
         if isinstance(flight, Flight):
             self.__flights[flight.get_flight_number()] = flight
@@ -106,37 +103,3 @@ class BookingSystem:
                 f'{len(self.__passengers)} passenger(s), '
                 f'{len(self.__bookings)} booking(s), '
                 f'{len(self.__cancelled_bookings)} cancelled')
-
-
-# quick test, only runs when this file is run directly
-if __name__ == '__main__':
-    from economy_ticket import EconomyTicket
-
-    system = BookingSystem()
-    passenger_1 = Passenger('Lui', 'lui@email.com', 'PA123456')
-    passenger_2 = Passenger('Sam', 'sam@email.com', 'PB654321')
-    passenger_3 = Passenger('Alex', 'alex@email.com', 'PC111222')
-    small_flight = Flight('QF401', 'SYD', 'MEL', '10:00', 2, 'scheduled')
-    cancelled_flight = Flight('QF500', 'SYD', 'BNE', '12:00', 100,
-                              'cancelled')
-
-    for passenger in (passenger_1, passenger_2, passenger_3):
-        system.register_passenger(passenger)
-    system.add_flight(small_flight)
-    system.add_flight(cancelled_flight)
-    ticket_1 = EconomyTicket(250.0, 1)
-
-    # group booking fills the 2 seats
-    booking_1 = system.create_booking([passenger_1, passenger_2],
-                                      small_flight, ticket_1)
-    print(booking_1)
-
-    # flight is full and the other one is cancelled, so both give None
-    print(system.create_booking(passenger_3, small_flight, ticket_1))
-    print(system.create_booking(passenger_3, cancelled_flight, ticket_1))
-    print([str(f) for f in system.get_available_flights()])
-
-    # cancelling frees the seats back up
-    system.cancel_booking('BK0001')
-    print(system.create_booking(passenger_3, small_flight, ticket_1))
-    print(system)

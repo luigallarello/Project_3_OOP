@@ -1,39 +1,31 @@
 from abc import ABC, abstractmethod
 
+# Both ticket types charge the same fee for a paid checked bag.
+BAG_FEE = 35.0
 
-# abstract, so you have to make an EconomyTicket or BusinessTicket instead
+
+# Abstract, so you have to make an EconomyTicket or BusinessTicket instead.
 class Ticket(ABC):
     def __init__(self, base_fare):
+        self.__base_fare = 0.0
         self.set_base_fare(base_fare)
 
     def get_base_fare(self):
         return self.__base_fare
 
     def set_base_fare(self, base_fare):
-        if isinstance(base_fare, float):
-            self.__base_fare = base_fare
+        # Whole numbers are fine too, they're stored as floats.
+        is_number = (isinstance(base_fare, (int, float))
+                     and not isinstance(base_fare, bool))
+        if is_number and base_fare >= 0:
+            self.__base_fare = float(base_fare)
+        else:
+            print(f'Invalid base fare: {base_fare}')
 
-    base_fare = property(get_base_fare, set_base_fare)
-
-    # each ticket type works these out its own way
     @abstractmethod
     def calculate_price(self):
-        pass
+        """Work out the full price, each ticket type does this itself."""
 
     @abstractmethod
     def baggage_allowance(self):
-        pass
-
-    # shared by both ticket types, uses their own calculate_price()
-    def __str__(self):
-        return (f'{type(self).__name__}: '
-                f'${self.calculate_price():.2f}')
-
-
-# quick test, only runs when this file is run directly
-if __name__ == '__main__':
-    # Ticket is abstract so this should fail
-    try:
-        Ticket(100.0)
-    except TypeError:
-        print("Can't make a plain Ticket, it's abstract")
+        """Describe the checked baggage this ticket includes."""
