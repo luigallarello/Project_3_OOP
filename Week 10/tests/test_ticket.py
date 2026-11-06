@@ -1,5 +1,6 @@
 import pytest
 
+from exceptions import InvalidFareError
 from economy_ticket import EconomyTicket
 from ticket import Ticket
 
@@ -31,30 +32,25 @@ class TestBaseFareValidation:
     def test_zero_fare_is_allowed(self):
         assert EconomyTicket(0, 0).calculate_price() == pytest.approx(0.0)
 
-    def test_negative_fare_is_rejected_and_fare_stays_zero(self, capsys):
-        ticket = EconomyTicket(-1, 0)
-        assert ticket.calculate_price() == pytest.approx(0.0)
-        assert 'Invalid base fare' in capsys.readouterr().out
+    @pytest.mark.parametrize('bad_fare', [-1, 'cheap', None])
+    def test_bad_fare_raises_when_creating_a_ticket(self, bad_fare):
+        with pytest.raises(InvalidFareError) as error:
+            EconomyTicket(bad_fare, 0)
+        assert error.value.base_fare == bad_fare
 
-    def test_text_fare_is_rejected_and_fare_stays_zero(self, capsys):
-        ticket = EconomyTicket('cheap', 0)
-        assert ticket.calculate_price() == pytest.approx(0.0)
-        assert 'Invalid base fare' in capsys.readouterr().out
-
-    def test_none_fare_is_rejected_and_fare_stays_zero(self, capsys):
-        ticket = EconomyTicket(None, 0)
-        assert ticket.calculate_price() == pytest.approx(0.0)
-        assert 'Invalid base fare' in capsys.readouterr().out
-
-    def test_true_is_rejected_as_a_fare(self, capsys):
+    def test_true_is_rejected_as_a_fare(self):
         # True counts as the number 1 in Python, so it needs its own check.
-        ticket = EconomyTicket(True, 0)
-        assert ticket.calculate_price() == pytest.approx(0.0)
-        assert 'Invalid base fare' in capsys.readouterr().out
+        with pytest.raises(InvalidFareError):
+            EconomyTicket(True, 0)
+
+    def test_smallest_negative_fare_is_rejected(self):
+        # Boundary: just below the lowest allowed fare of 0.
+        with pytest.raises(InvalidFareError):
+            EconomyTicket(-0.01, 0)
 
     def test_set_base_fare_rejects_bad_value_after_creation(self,
-                                                            economy_ticket,
-                                                            capsys):
-        economy_ticket.set_base_fare(-50)
+                                                            economy_ticket):
+        with pytest.raises(InvalidFareError, match='Invalid base fare: -50'):
+            economy_ticket.set_base_fare(-50)
+        # The failed change leaves the old fare in place.
         assert economy_ticket.get_base_fare() == pytest.approx(250.0)
-        assert 'Invalid base fare: -50' in capsys.readouterr().out

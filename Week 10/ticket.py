@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 
+from exceptions import InvalidFareError
+
 # Both ticket types charge the same fee for a paid checked bag.
 BAG_FEE = 35.0
 
@@ -7,6 +9,8 @@ BAG_FEE = 35.0
 # Abstract, so you have to make an EconomyTicket or BusinessTicket instead.
 class Ticket(ABC):
     def __init__(self, base_fare):
+        # set_base_fare raises before anything is stored, so a ticket with
+        # a bad fare is never created.
         self.__base_fare = 0.0
         self.set_base_fare(base_fare)
 
@@ -17,10 +21,9 @@ class Ticket(ABC):
         # Whole numbers are fine too, they're stored as floats.
         is_number = (isinstance(base_fare, (int, float))
                      and not isinstance(base_fare, bool))
-        if is_number and base_fare >= 0:
-            self.__base_fare = float(base_fare)
-        else:
-            print(f'Invalid base fare: {base_fare}')
+        if not is_number or base_fare < 0:
+            raise InvalidFareError(base_fare)
+        self.__base_fare = float(base_fare)
 
     @abstractmethod
     def calculate_price(self):

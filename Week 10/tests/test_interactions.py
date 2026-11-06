@@ -1,6 +1,8 @@
 import pytest
 
 from booking import Booking
+from exceptions import (BookingStateError, DuplicatePassengerError,
+                        FlightFullError)
 from ticket import Ticket
 
 
@@ -56,13 +58,17 @@ class TestBookingAndFlightRelationship:
     def test_booking_reacts_when_its_flight_departs(self, booking,
                                                     scheduled_flight):
         scheduled_flight.set_status('departed')
-        assert booking.cancel_booking() is False
-        assert booking.confirm_booking() is False
+        with pytest.raises(BookingStateError):
+            booking.cancel_booking()
+        with pytest.raises(BookingStateError):
+            booking.confirm_booking()
+        assert booking.get_status() == 'pending'
 
     def test_booking_reacts_when_its_flight_is_cancelled(self, booking,
                                                          scheduled_flight):
         scheduled_flight.set_status('cancelled')
-        assert booking.confirm_booking() is False
+        with pytest.raises(BookingStateError):
+            booking.confirm_booking()
         # Passengers can still cancel their own booking.
         assert booking.cancel_booking() is True
 
@@ -87,7 +93,8 @@ class TestBookingAndPassengerRelationship:
             economy_ticket):
         new_booking = system.create_booking(lui, scheduled_flight,
                                             economy_ticket)
-        assert new_booking.add_passenger(lui_duplicate) is False
+        with pytest.raises(DuplicatePassengerError):
+            new_booking.add_passenger(lui_duplicate)
         assert new_booking.total_cost() == pytest.approx(285.0)
 
     def test_passenger_added_to_a_booking_later_takes_a_seat(
@@ -118,8 +125,8 @@ class TestBookingWorkflow:
         system.create_booking([lui, sam, alex], scheduled_flight,
                               economy_ticket)
         # The flight is full, so nobody else can book.
-        assert system.create_booking(lui, scheduled_flight,
-                                     economy_ticket) is None
+        with pytest.raises(FlightFullError):
+            system.create_booking(lui, scheduled_flight, economy_ticket)
 
         system.cancel_booking('BK0001')
         replacement = system.create_booking(lui, scheduled_flight,
@@ -145,7 +152,8 @@ class TestBookingWorkflow:
         late.confirm_booking()
         delayed_flight.set_status('departed')
 
-        assert system.cancel_booking('BK0001') is None
+        with pytest.raises(BookingStateError):
+            system.cancel_booking('BK0001')
         assert late.get_status() == 'confirmed'
         assert delayed_flight.get_status() == 'departed'
 

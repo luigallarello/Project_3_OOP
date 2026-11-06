@@ -1,5 +1,6 @@
 import pytest
 
+from exceptions import InvalidBaggageError
 from business_ticket import BusinessTicket
 from ticket import Ticket
 
@@ -39,38 +40,26 @@ class TestBusinessPrice:
 
 
 class TestBusinessBagLimits:
-    def test_five_bags_is_rejected(self, capsys):
-        # Boundary: one more than the maximum. The ticket stays valid with
-        # no bags instead of keeping the bad number.
-        ticket = BusinessTicket(500.0, False, 5)
-        assert ticket.calculate_price() == pytest.approx(500.0)
-        assert ticket.baggage_allowance() == 'You have 0 x 23 kg bags'
-        assert 'Business only allows 0-4 checked bags' in (
-            capsys.readouterr().out)
+    def test_five_bags_is_rejected(self):
+        # Boundary: one more than the maximum.
+        with pytest.raises(InvalidBaggageError) as error:
+            BusinessTicket(500.0, False, 5)
+        assert 'Business only allows 0-4 checked bags' in str(error.value)
+        assert error.value.bag_count == 5
+        assert error.value.max_bags == 4
 
-    def test_negative_bag_count_is_rejected(self, capsys):
-        ticket = BusinessTicket(500.0, False, -1)
-        assert ticket.baggage_allowance() == 'You have 0 x 23 kg bags'
-        assert 'Business only allows 0-4 checked bags' in (
-            capsys.readouterr().out)
-
-    def test_text_bag_count_is_rejected(self, capsys):
-        ticket = BusinessTicket(500.0, False, 'two')
-        assert ticket.baggage_allowance() == 'You have 0 x 23 kg bags'
-        assert 'Business only allows' in capsys.readouterr().out
-
-    def test_decimal_bag_count_is_rejected(self, capsys):
-        ticket = BusinessTicket(500.0, False, 2.5)
-        assert ticket.baggage_allowance() == 'You have 0 x 23 kg bags'
-        assert 'Business only allows' in capsys.readouterr().out
+    @pytest.mark.parametrize('bad_count', [-1, 'two', 2.5])
+    def test_bad_bag_counts_are_rejected(self, bad_count):
+        with pytest.raises(InvalidBaggageError, match='Business only allows'):
+            BusinessTicket(500.0, False, bad_count)
 
     def test_changing_to_a_bad_count_keeps_the_old_count(self,
-                                                         business_ticket,
-                                                         capsys):
-        business_ticket.set_checked_bag_count(9)
+                                                         business_ticket):
+        with pytest.raises(InvalidBaggageError):
+            business_ticket.set_checked_bag_count(9)
         assert business_ticket.baggage_allowance() == (
             'You have 3 x 23 kg bags')
-        assert 'Business only allows' in capsys.readouterr().out
+        assert business_ticket.calculate_price() == pytest.approx(615.0)
 
     def test_changing_to_a_valid_count_updates_the_price(self,
                                                          business_ticket):

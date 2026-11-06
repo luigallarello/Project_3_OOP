@@ -1,3 +1,5 @@
+from exceptions import InvalidFlightStatusError
+
 _VALID_STATUSES = {'scheduled', 'delayed', 'departed', 'cancelled'}
 
 
@@ -9,7 +11,8 @@ class Flight:
         self.__destination = destination
         self.__departure_time = departure_time
         self.__capacity = capacity
-        # Default to scheduled in case the status passed in isn't valid.
+        # set_status raises on a bad status, so the flight is never
+        # created in an invalid state.
         self.__status = 'scheduled'
         self.set_status(status)
 
@@ -23,10 +26,9 @@ class Flight:
         return self.__status
 
     def set_status(self, status):
-        if status in _VALID_STATUSES:
-            self.__status = status
-        else:
-            print(f'Invalid flight status: {status}')
+        if status not in _VALID_STATUSES:
+            raise InvalidFlightStatusError(status, _VALID_STATUSES)
+        self.__status = status
 
     def __str__(self):
         return (f'{self.__flight_number}: {self.__origin} -> '

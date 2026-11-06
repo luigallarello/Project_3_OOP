@@ -1,9 +1,17 @@
+from exceptions import InvalidBaggageError
 from ticket import BAG_FEE, Ticket
 
 
 class EconomyTicket(Ticket):
     def __init__(self, base_fare, checked_bag_count):
         super().__init__(base_fare)
+        # Economy has no upper limit (every bag is paid for), but the
+        # count still has to be a whole number that isn't negative.
+        is_valid = (isinstance(checked_bag_count, int)
+                    and not isinstance(checked_bag_count, bool)
+                    and checked_bag_count >= 0)
+        if not is_valid:
+            raise InvalidBaggageError('Economy', checked_bag_count)
         self.__checked_bag_count = checked_bag_count
 
     def calculate_price(self):

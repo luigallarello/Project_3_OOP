@@ -1,6 +1,8 @@
 import pytest
 
 from booking import Booking
+from exceptions import (BookingStateError, DuplicatePassengerError,
+                        WrongObjectTypeError)
 
 
 class TestBookingCreation:
@@ -32,20 +34,31 @@ class TestAddPassenger:
         assert booking.get_passengers() == [lui, sam]
 
     def test_same_passenger_is_not_added_twice(self, booking, lui):
-        assert booking.add_passenger(lui) is False
+        with pytest.raises(DuplicatePassengerError) as error:
+            booking.add_passenger(lui)
+        assert error.value.passenger is lui
+        assert error.value.booking_reference == 'BK0001'
         assert len(booking.get_passengers()) == 1
 
     def test_different_object_with_same_passport_is_not_added(
             self, booking, lui_duplicate):
-        assert booking.add_passenger(lui_duplicate) is False
+        with pytest.raises(DuplicatePassengerError,
+                           match='passport PA123456'):
+            booking.add_passenger(lui_duplicate)
         assert len(booking.get_passengers()) == 1
 
-    def test_text_is_rejected_as_a_passenger(self, booking):
-        assert booking.add_passenger('Sam') is False
+    @pytest.mark.parametrize('not_a_passenger', ['Sam', None])
+    def test_non_passengers_are_rejected(self, booking, not_a_passenger):
+        with pytest.raises(WrongObjectTypeError,
+                           match='Expected a Passenger'):
+            booking.add_passenger(not_a_passenger)
         assert len(booking.get_passengers()) == 1
 
-    def test_none_is_rejected_as_a_passenger(self, booking):
-        assert booking.add_passenger(None) is False
+    def test_nobody_can_be_added_to_a_cancelled_booking(self, booking,
+                                                        sam):
+        booking.cancel_booking()
+        with pytest.raises(BookingStateError, match='cancelled'):
+            booking.add_passenger(sam)
         assert len(booking.get_passengers()) == 1
 
     def test_returned_list_is_a_copy(self, booking, sam):
@@ -60,12 +73,16 @@ class TestConfirmBooking:
 
     def test_confirmed_booking_cannot_be_confirmed_again(self, booking):
         booking.confirm_booking()
-        assert booking.confirm_booking() is False
+        with pytest.raises(BookingStateError) as error:
+            booking.confirm_booking()
+        assert error.value.action == 'confirmed'
+        assert error.value.reason == 'it is already confirmed'
         assert booking.get_status() == 'confirmed'
 
     def test_cancelled_booking_cannot_be_confirmed(self, booking):
         booking.cancel_booking()
-        assert booking.confirm_booking() is False
+        with pytest.raises(BookingStateError, match='already cancelled'):
+            booking.confirm_booking()
         assert booking.get_status() == 'cancelled'
 
     def test_booking_on_delayed_flight_can_be_confirmed(
@@ -78,12 +95,15 @@ class TestConfirmBooking:
             self, lui, cancelled_flight, economy_ticket):
         doomed = Booking('BK0005', '2026-10-31', [lui], cancelled_flight,
                          economy_ticket)
-        assert doomed.confirm_booking() is False
+        with pytest.raises(BookingStateError,
+                           match='QF500 is not flying'):
+            doomed.confirm_booking()
         assert doomed.get_status() == 'pending'
 
     def test_booking_on_departed_flight_cannot_be_confirmed(
             self, departed_booking):
-        assert departed_booking.confirm_booking() is False
+        with pytest.raises(BookingStateError, match='departed'):
+            departed_booking.confirm_booking()
         assert departed_booking.get_status() == 'pending'
 
 
@@ -99,12 +119,17 @@ class TestCancelBooking:
 
     def test_cancelled_booking_cannot_be_cancelled_again(self, booking):
         booking.cancel_booking()
-        assert booking.cancel_booking() is False
+        with pytest.raises(BookingStateError) as error:
+            booking.cancel_booking()
+        assert str(error.value) == (
+            'Booking BK0001 cannot be cancelled: it is already cancelled')
         assert booking.get_status() == 'cancelled'
 
     def test_booking_on_departed_flight_cannot_be_cancelled(
             self, departed_booking):
-        assert departed_booking.cancel_booking() is False
+        with pytest.raises(BookingStateError,
+                           match='QF900 has already departed'):
+            departed_booking.cancel_booking()
         assert departed_booking.get_status() == 'pending'
 
 
@@ -122,7 +147,8 @@ class TestTotalCost:
 
     def test_cost_does_not_change_when_a_duplicate_is_rejected(
             self, booking, lui_duplicate):
-        booking.add_passenger(lui_duplicate)
+        with pytest.raises(DuplicatePassengerError):
+            booking.add_passenger(lui_duplicate)
         assert booking.total_cost() == pytest.approx(285.0)
 
     def test_cost_uses_the_business_ticket_price(self, lui, sam,

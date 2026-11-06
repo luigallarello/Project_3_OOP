@@ -1,5 +1,12 @@
 import datetime
 
+import pytest
+
+from exceptions import (BookingNotFoundError, BookingStateError,
+                        EmptyBookingError, FlightFullError,
+                        FlightNotBookableError, FlightNotFoundError,
+                        PassengerNotRegisteredError,
+                        WrongObjectTypeError)
 from booking import Booking
 from flight import Flight
 from passenger import Passenger
@@ -11,20 +18,19 @@ class TestRegistration:
             'Booking system: 4 flight(s), 3 passenger(s), 0 booking(s), '
             '0 cancelled')
 
-    def test_text_is_ignored_as_a_flight(self, empty_system):
-        empty_system.add_flight('QF401')
+    @pytest.mark.parametrize('not_a_flight', ['QF401', None])
+    def test_non_flights_are_rejected(self, empty_system, not_a_flight):
+        with pytest.raises(WrongObjectTypeError) as error:
+            empty_system.add_flight(not_a_flight)
+        assert error.value.expected == 'Flight'
         assert '0 flight(s)' in str(empty_system)
 
-    def test_none_is_ignored_as_a_flight(self, empty_system):
-        empty_system.add_flight(None)
-        assert '0 flight(s)' in str(empty_system)
-
-    def test_text_is_ignored_as_a_passenger(self, empty_system):
-        empty_system.register_passenger('Lui')
-        assert '0 passenger(s)' in str(empty_system)
-
-    def test_none_is_ignored_as_a_passenger(self, empty_system):
-        empty_system.register_passenger(None)
+    @pytest.mark.parametrize('not_a_passenger', ['Lui', None])
+    def test_non_passengers_are_rejected(self, empty_system,
+                                         not_a_passenger):
+        with pytest.raises(WrongObjectTypeError,
+                           match='Expected a Passenger'):
+            empty_system.register_passenger(not_a_passenger)
         assert '0 passenger(s)' in str(empty_system)
 
     def test_registering_the_same_passport_twice_keeps_one_passenger(
@@ -90,64 +96,98 @@ class TestCreateBookingFailures:
                                                scheduled_flight,
                                                economy_ticket):
         stranger = Passenger('Bob', 'bob@email.com', 'PZ999999')
-        assert system.create_booking(stranger, scheduled_flight,
-                                     economy_ticket) is None
+        with pytest.raises(PassengerNotRegisteredError) as error:
+            system.create_booking(stranger, scheduled_flight,
+                                  economy_ticket)
+        assert error.value.passenger is stranger
+        assert str(error.value) == (
+            'Bob (passport PZ999999) is not registered')
 
     def test_group_with_one_unregistered_passenger_is_refused(
             self, system, lui, scheduled_flight, economy_ticket):
         stranger = Passenger('Bob', 'bob@email.com', 'PZ999999')
-        assert system.create_booking([lui, stranger], scheduled_flight,
-                                     economy_ticket) is None
+        with pytest.raises(PassengerNotRegisteredError):
+            system.create_booking([lui, stranger], scheduled_flight,
+                                  economy_ticket)
         assert system.seats_booked(scheduled_flight) == 0
 
     def test_empty_passenger_list_is_refused(self, system,
                                              scheduled_flight,
                                              economy_ticket):
-        assert system.create_booking([], scheduled_flight,
-                                     economy_ticket) is None
+        with pytest.raises(EmptyBookingError):
+            system.create_booking([], scheduled_flight, economy_ticket)
 
     def test_flight_not_in_the_system_is_refused(self, system, lui,
                                                  two_seat_flight,
                                                  economy_ticket):
-        assert system.create_booking(lui, two_seat_flight,
-                                     economy_ticket) is None
+        with pytest.raises(FlightNotFoundError) as error:
+            system.create_booking(lui, two_seat_flight, economy_ticket)
+        assert error.value.flight_number == 'QF222'
 
     def test_cancelled_flight_is_refused(self, system, lui,
                                          cancelled_flight, economy_ticket):
-        assert system.create_booking(lui, cancelled_flight,
-                                     economy_ticket) is None
+        with pytest.raises(FlightNotBookableError) as error:
+            system.create_booking(lui, cancelled_flight, economy_ticket)
+        assert error.value.status == 'cancelled'
+        assert str(error.value) == (
+            'Flight QF500 is cancelled and is not taking bookings')
 
     def test_departed_flight_is_refused(self, system, lui, departed_flight,
                                         economy_ticket):
-        assert system.create_booking(lui, departed_flight,
-                                     economy_ticket) is None
+        with pytest.raises(FlightNotBookableError, match='departed'):
+            system.create_booking(lui, departed_flight, economy_ticket)
 
     def test_group_bigger_than_the_remaining_seats_is_refused(
             self, system, lui, sam, alex, scheduled_flight, economy_ticket):
         system.create_booking([lui, sam], scheduled_flight, economy_ticket)
         # One seat left, two people want it.
-        assert system.create_booking([alex, lui], scheduled_flight,
-                                     economy_ticket) is None
+        with pytest.raises(FlightFullError) as error:
+            system.create_booking([alex, lui], scheduled_flight,
+                                  economy_ticket)
+        assert error.value.seats_requested == 2
+        assert error.value.seats_left == 1
+        assert system.seats_booked(scheduled_flight) == 2
 
     def test_flight_with_no_seats_is_refused(self, empty_system, lui,
                                              economy_ticket):
         empty_flight = Flight('QF0', 'SYD', 'NTL', '08:00', 0, 'scheduled')
         empty_system.register_passenger(lui)
         empty_system.add_flight(empty_flight)
-        assert empty_system.create_booking(lui, empty_flight,
-                                           economy_ticket) is None
+        with pytest.raises(FlightFullError, match='0 seat'):
+            empty_system.create_booking(lui, empty_flight, economy_ticket)
+
+    def test_text_in_the_passenger_list_is_rejected(self, system, lui,
+                                                    scheduled_flight,
+                                                    economy_ticket):
+        with pytest.raises(WrongObjectTypeError) as error:
+            system.create_booking([lui, 'Sam'], scheduled_flight,
+                                  economy_ticket)
+        assert error.value.received == 'Sam'
+        assert '0 booking(s)' in str(system)
+
+    def test_text_is_rejected_as_a_ticket(self, system, lui,
+                                          scheduled_flight):
+        with pytest.raises(WrongObjectTypeError, match='Expected a Ticket'):
+            system.create_booking(lui, scheduled_flight, 'economy')
+
+    def test_text_is_rejected_as_a_flight(self, system, lui,
+                                          economy_ticket):
+        with pytest.raises(WrongObjectTypeError, match='Expected a Flight'):
+            system.create_booking(lui, 'QF401', economy_ticket)
 
     def test_failed_booking_does_not_use_up_a_reference(
             self, system, lui, cancelled_flight, delayed_flight,
             economy_ticket):
-        system.create_booking(lui, cancelled_flight, economy_ticket)
+        with pytest.raises(FlightNotBookableError):
+            system.create_booking(lui, cancelled_flight, economy_ticket)
         next_booking = system.create_booking(lui, delayed_flight,
                                              economy_ticket)
         assert next_booking.get_booking_reference() == 'BK0001'
 
     def test_failed_booking_is_not_stored(self, system, lui,
                                           cancelled_flight, economy_ticket):
-        system.create_booking(lui, cancelled_flight, economy_ticket)
+        with pytest.raises(FlightNotBookableError):
+            system.create_booking(lui, cancelled_flight, economy_ticket)
         assert '0 booking(s)' in str(system)
 
 
@@ -207,27 +247,32 @@ class TestCancelBooking:
         assert system.cancel_booking('BK0001') is confirmed
         assert confirmed.get_status() == 'cancelled'
 
-    def test_unknown_reference_returns_none(self, system):
-        assert system.cancel_booking('BK9999') is None
+    def test_unknown_reference_raises(self, system):
+        with pytest.raises(BookingNotFoundError) as error:
+            system.cancel_booking('BK9999')
+        assert error.value.booking_reference == 'BK9999'
+        assert str(error.value) == (
+            "No booking found with reference 'BK9999'")
 
-    def test_number_as_a_reference_returns_none(self, system):
-        assert system.cancel_booking(1) is None
+    @pytest.mark.parametrize('bad_reference', [1, None, ['BK0001']])
+    def test_non_text_reference_raises(self, system, bad_reference):
+        with pytest.raises(BookingNotFoundError):
+            system.cancel_booking(bad_reference)
 
-    def test_none_as_a_reference_returns_none(self, system):
-        assert system.cancel_booking(None) is None
-
-    def test_cancelling_twice_returns_none_the_second_time(
+    def test_cancelling_twice_raises_the_second_time(
             self, system, lui, scheduled_flight, economy_ticket):
         system.create_booking(lui, scheduled_flight, economy_ticket)
         system.cancel_booking('BK0001')
-        assert system.cancel_booking('BK0001') is None
+        with pytest.raises(BookingStateError, match='already cancelled'):
+            system.cancel_booking('BK0001')
         assert '1 cancelled' in str(system)
 
     def test_booking_on_a_departed_flight_stays_active(
             self, system, lui, delayed_flight, economy_ticket):
         late = system.create_booking(lui, delayed_flight, economy_ticket)
         delayed_flight.set_status('departed')
-        assert system.cancel_booking('BK0001') is None
+        with pytest.raises(BookingStateError):
+            system.cancel_booking('BK0001')
         # The failed cancel leaves the booking and its seat as they were.
         assert late.get_status() == 'pending'
         assert system.seats_booked(delayed_flight) == 1

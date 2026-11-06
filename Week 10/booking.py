@@ -1,3 +1,5 @@
+from exceptions import (BookingStateError, DuplicatePassengerError,
+                        WrongObjectTypeError)
 from passenger import Passenger
 
 
@@ -23,12 +25,18 @@ class Booking:
         return list(self.__passengers)
 
     def add_passenger(self, passenger):
+        # Every check happens before the list is touched, so a failed add
+        # leaves the booking exactly as it was.
         if not isinstance(passenger, Passenger):
-            return False
+            raise WrongObjectTypeError('Passenger', passenger)
+        if self.__status == 'cancelled':
+            raise BookingStateError(self.__booking_reference,
+                                    'changed', 'it has been cancelled')
         # Don't add the same person twice.
         for existing in self.__passengers:
             if existing.equals(passenger):
-                return False
+                raise DuplicatePassengerError(passenger,
+                                              self.__booking_reference)
         self.__passengers.append(passenger)
         return True
 
@@ -38,19 +46,28 @@ class Booking:
     def confirm_booking(self):
         # Only a pending booking can be confirmed.
         if self.__status != 'pending':
-            return False
+            raise BookingStateError(self.__booking_reference, 'confirmed',
+                                    f'it is already {self.__status}')
         # A booking can't be confirmed for a flight that won't fly.
-        if self.__flight.get_status() in ('cancelled', 'departed'):
-            return False
+        flight_status = self.__flight.get_status()
+        if flight_status in ('cancelled', 'departed'):
+            raise BookingStateError(
+                self.__booking_reference, 'confirmed',
+                f'flight {self.__flight.get_flight_number()} is not flying '
+                f'({flight_status})')
         self.__status = 'confirmed'
         return True
 
     def cancel_booking(self):
         if self.__status == 'cancelled':
-            return False
+            raise BookingStateError(self.__booking_reference, 'cancelled',
+                                    'it is already cancelled')
         # Once the flight has left it's too late to cancel.
         if self.__flight.get_status() == 'departed':
-            return False
+            raise BookingStateError(
+                self.__booking_reference, 'cancelled',
+                f'flight {self.__flight.get_flight_number()} has already '
+                f'departed')
         self.__status = 'cancelled'
         return True
 
