@@ -13,14 +13,18 @@ BookingSystemError
         BookingStateError
         FlightNotBookableError
         FlightFullError
+        FlightStatusChangeError
     InvalidValueError          - a value breaks a rule
         InvalidFareError
         InvalidBaggageError
         InvalidFlightStatusError
+        InvalidCapacityError
+        InvalidPassengerDetailsError
         EmptyBookingError
     ParticipationError         - an object can't take part in the action
         WrongObjectTypeError
         DuplicatePassengerError
+        DuplicateFlightError
 """
 
 
@@ -34,6 +38,8 @@ class NotFoundError(BookingSystemError):
 
 
 class BookingNotFoundError(NotFoundError):
+    """No booking is stored under the given reference."""
+
     def __init__(self, booking_reference):
         self.booking_reference = booking_reference
         super().__init__(f'No booking found with reference '
@@ -41,6 +47,8 @@ class BookingNotFoundError(NotFoundError):
 
 
 class FlightNotFoundError(NotFoundError):
+    """The flight hasn't been added to the booking system."""
+
     def __init__(self, flight_number):
         self.flight_number = flight_number
         super().__init__(f'Flight {flight_number} is not in the booking '
@@ -48,6 +56,8 @@ class FlightNotFoundError(NotFoundError):
 
 
 class PassengerNotRegisteredError(NotFoundError):
+    """The passenger hasn't been registered with the booking system."""
+
     def __init__(self, passenger):
         self.passenger = passenger
         super().__init__(f'{passenger.get_name()} (passport '
@@ -61,6 +71,8 @@ class InvalidStateError(BookingSystemError):
 
 
 class BookingStateError(InvalidStateError):
+    """A booking can't be confirmed, cancelled or changed right now."""
+
     def __init__(self, booking_reference, action, reason):
         self.booking_reference = booking_reference
         self.action = action
@@ -70,6 +82,8 @@ class BookingStateError(InvalidStateError):
 
 
 class FlightNotBookableError(InvalidStateError):
+    """The flight has departed or been cancelled, so it can't be booked."""
+
     def __init__(self, flight_number, status):
         self.flight_number = flight_number
         self.status = status
@@ -78,6 +92,8 @@ class FlightNotBookableError(InvalidStateError):
 
 
 class FlightFullError(InvalidStateError):
+    """There aren't enough seats left for the passengers requested."""
+
     def __init__(self, flight_number, seats_requested, seats_left):
         self.flight_number = flight_number
         self.seats_requested = seats_requested
@@ -86,12 +102,25 @@ class FlightFullError(InvalidStateError):
                          f'left but {seats_requested} were requested')
 
 
+class FlightStatusChangeError(InvalidStateError):
+    """A departed or cancelled flight can't change to another status."""
+
+    def __init__(self, flight_number, current_status, new_status):
+        self.flight_number = flight_number
+        self.current_status = current_status
+        self.new_status = new_status
+        super().__init__(f'Flight {flight_number} is {current_status} and '
+                         f'cannot be changed to {new_status}')
+
+
 # A supplied value breaks a rule.
 class InvalidValueError(BookingSystemError):
     """A value given to the system breaks one of its rules."""
 
 
 class InvalidFareError(InvalidValueError):
+    """A ticket's base fare is negative or isn't a number."""
+
     def __init__(self, base_fare):
         self.base_fare = base_fare
         super().__init__(f'Invalid base fare: {base_fare!r}. A fare must be '
@@ -99,6 +128,8 @@ class InvalidFareError(InvalidValueError):
 
 
 class InvalidBaggageError(InvalidValueError):
+    """A checked bag count is out of range or isn't a whole number."""
+
     def __init__(self, ticket_type, bag_count, max_bags=None):
         self.ticket_type = ticket_type
         self.bag_count = bag_count
@@ -112,6 +143,8 @@ class InvalidBaggageError(InvalidValueError):
 
 
 class InvalidFlightStatusError(InvalidValueError):
+    """The status given isn't one a flight can have."""
+
     def __init__(self, status, valid_statuses):
         self.status = status
         self.valid_statuses = valid_statuses
@@ -120,7 +153,28 @@ class InvalidFlightStatusError(InvalidValueError):
                          f'of: {options}')
 
 
+class InvalidCapacityError(InvalidValueError):
+    """A flight's seat capacity is negative or isn't a whole number."""
+
+    def __init__(self, capacity):
+        self.capacity = capacity
+        super().__init__(f'Invalid capacity: {capacity!r}. Capacity must be '
+                         f'a whole number of 0 or more')
+
+
+class InvalidPassengerDetailsError(InvalidValueError):
+    """A passenger's name, email or passport number is blank or not text."""
+
+    def __init__(self, field, value):
+        self.field = field
+        self.value = value
+        super().__init__(f'Invalid passenger {field}: {value!r}. It must be '
+                         f'text that isn\'t blank')
+
+
 class EmptyBookingError(InvalidValueError):
+    """A booking was requested with no passengers on it."""
+
     def __init__(self):
         super().__init__('A booking needs at least one passenger')
 
@@ -131,6 +185,8 @@ class ParticipationError(BookingSystemError):
 
 
 class WrongObjectTypeError(ParticipationError):
+    """An object of the wrong class was passed in."""
+
     def __init__(self, expected, received):
         self.expected = expected
         self.received = received
@@ -139,9 +195,20 @@ class WrongObjectTypeError(ParticipationError):
 
 
 class DuplicatePassengerError(ParticipationError):
+    """The passenger is already on the booking."""
+
     def __init__(self, passenger, booking_reference):
         self.passenger = passenger
         self.booking_reference = booking_reference
         super().__init__(f'{passenger.get_name()} (passport '
                          f'{passenger.get_passport_number()}) is already on '
                          f'booking {booking_reference}')
+
+
+class DuplicateFlightError(ParticipationError):
+    """A flight with the same number is already in the system."""
+
+    def __init__(self, flight_number):
+        self.flight_number = flight_number
+        super().__init__(f'Flight {flight_number} is already in the booking '
+                         f'system')

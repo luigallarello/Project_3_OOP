@@ -1,5 +1,17 @@
+from exceptions import InvalidPassengerDetailsError
+
+
 class Passenger:
+    """A traveller, identified by their passport number."""
+
     def __init__(self, name, email, passport_number):
+        # Every detail is checked before any is stored, so a passenger
+        # with missing details is never created.
+        details = {'name': name, 'email': email,
+                   'passport number': passport_number}
+        for field, value in details.items():
+            if not isinstance(value, str) or not value.strip():
+                raise InvalidPassengerDetailsError(field, value)
         self.__name = name
         self.__email = email
         self.__passport_number = passport_number

@@ -1,12 +1,12 @@
 Name                 Stmts   Miss Branch BrPart  Cover
 ------------------------------------------------------
-booking.py              52      0     18      0   100%
-booking_system.py      146      0     40      0   100%
-business_ticket.py      27      0      4      0   100%
-economy_ticket.py       15      0      2      0   100%
-exceptions.py           66      0      2      0   100%
-flight.py               23      0      2      0   100%
-passenger.py            15      0      2      0   100%
-ticket.py               18      0      2      0   100%
+booking.py              53      0     16      0   100%
+booking_system.py      166      0     46      0   100%
+business_ticket.py      20      0      2      0   100%
+economy_ticket.py        9      0      0      0   100%
+exceptions.py           85      0      2      0   100%
+flight.py               36      0      6      0   100%
+passenger.py            20      0      6      0   100%
+ticket.py               33      0      6      0   100%
 ------------------------------------------------------
-TOTAL                  362      0     72      0   100%
+TOTAL                  422      0     84      0   100%

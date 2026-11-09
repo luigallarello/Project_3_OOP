@@ -6,7 +6,7 @@ from ticket import Ticket
 
 class TestEconomyPrice:
     def test_price_is_fare_plus_bag_fee(self, economy_ticket):
-        # 250 fare + 1 bag at $35.
+        # The $250 fare plus one bag at $35.
         assert economy_ticket.calculate_price() == pytest.approx(285.0)
 
     def test_no_bags_means_just_the_fare(self):

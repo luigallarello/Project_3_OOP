@@ -1,6 +1,6 @@
 import pytest
 
-from exceptions import InvalidFareError
+from exceptions import InvalidBaggageError, InvalidFareError
 from economy_ticket import EconomyTicket
 from ticket import Ticket
 
@@ -54,3 +54,22 @@ class TestBaseFareValidation:
             economy_ticket.set_base_fare(-50)
         # The failed change leaves the old fare in place.
         assert economy_ticket.get_base_fare() == pytest.approx(250.0)
+
+
+class TestSharedBagCount:
+    # Both ticket types store and check their bags through Ticket.
+    def test_both_types_report_their_bag_count(self, economy_ticket,
+                                               business_ticket):
+        assert economy_ticket.get_checked_bag_count() == 1
+        assert business_ticket.get_checked_bag_count() == 3
+
+    def test_economy_bag_count_can_be_changed(self, economy_ticket):
+        economy_ticket.set_checked_bag_count(3)
+        assert economy_ticket.calculate_price() == pytest.approx(355.0)
+
+    def test_each_type_names_itself_in_the_error(self, economy_ticket,
+                                                 business_ticket):
+        with pytest.raises(InvalidBaggageError, match='^Economy'):
+            economy_ticket.set_checked_bag_count(-1)
+        with pytest.raises(InvalidBaggageError, match='^Business'):
+            business_ticket.set_checked_bag_count(5)

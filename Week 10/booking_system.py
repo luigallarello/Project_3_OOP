@@ -2,29 +2,34 @@ import datetime
 
 from booking import Booking
 from exceptions import (BookingNotFoundError, BookingSystemError,
-                        EmptyBookingError, FlightFullError,
-                        FlightNotBookableError, FlightNotFoundError,
-                        PassengerNotRegisteredError, WrongObjectTypeError)
+                        DuplicateFlightError, EmptyBookingError,
+                        FlightFullError, FlightNotBookableError,
+                        FlightNotFoundError, PassengerNotRegisteredError,
+                        WrongObjectTypeError)
 from flight import Flight
 from passenger import Passenger
 from ticket import Ticket
 
-# flights in these states can still take bookings
-_BOOKABLE_STATUSES = {'scheduled', 'delayed'}
-
 
 class BookingSystem:
+    """Keeps track of flights, passengers and bookings, and makes bookings.
+
+    The core methods raise a custom exception as soon as a rule is broken.
+    The request_ methods call them, catch any booking error, report it and
+    return None so the program can carry on.
+    """
+
     BOOKING_PREFIX = 'BK'
 
     def __init__(self):
-        # flights keyed by flight number, passengers by passport number,
-        # bookings by booking reference
+        # Dictionaries give a quick lookup by each object's unique key:
+        # flight number, passport number and booking reference.
         self.__flights = {}
         self.__bookings = {}
         self.__passengers = {}
-        self.__cancelled_bookings = set()
         self.__count = 1
-        # messages from every request that failed and was handled
+        # A list keeps every handled error message in the order it
+        # happened.
         self.__error_log = []
 
     # ------------------------------------------------------------------
@@ -34,6 +39,10 @@ class BookingSystem:
     def add_flight(self, flight):
         if not isinstance(flight, Flight):
             raise WrongObjectTypeError('Flight', flight)
+        # Replacing a flight would leave its bookings pointing at the old
+        # one, so each flight number can only be added once.
+        if flight.get_flight_number() in self.__flights:
+            raise DuplicateFlightError(flight.get_flight_number())
         self.__flights[flight.get_flight_number()] = flight
 
     def register_passenger(self, passenger):
@@ -58,10 +67,11 @@ class BookingSystem:
         return booking
 
     def create_booking(self, passengers, flight, ticket):
-        # lets you pass in a single passenger as well as a list
+        # A single passenger is accepted as well as a list of them.
         if isinstance(passengers, Passenger):
             passengers = [passengers]
-
+        if not isinstance(passengers, list):
+            raise WrongObjectTypeError('list of Passengers', passengers)
         if len(passengers) == 0:
             raise EmptyBookingError()
 
@@ -75,7 +85,7 @@ class BookingSystem:
         self.__check_seats(flight, len(passengers))
 
         # Every check has passed, so it's now safe to change the system.
-        # e.g. BK0001, BK0002...
+        # References count up from BK0001.
         reference = f'{self.BOOKING_PREFIX}{self.__count:04d}'
         booking_date = str(datetime.date.today())
 
@@ -96,18 +106,19 @@ class BookingSystem:
 
     def cancel_booking(self, booking_reference):
         booking = self.get_booking(booking_reference)
-        # The booking decides if it can be cancelled, for example not
-        # once the flight has departed. If it can't, it raises and the
-        # line below never runs, so the seat isn't given back.
+        # The booking decides if it can be cancelled and raises if it
+        # can't, for example once the flight has departed.
         booking.cancel_booking()
-        self.__cancelled_bookings.add(booking_reference)
         return booking
 
     def seats_booked(self, flight):
+        if not isinstance(flight, Flight):
+            raise WrongObjectTypeError('Flight', flight)
         total = 0
-        for reference, booking in self.__bookings.items():
-            # cancelled bookings give their seats back
-            if reference in self.__cancelled_bookings:
+        for booking in self.__bookings.values():
+            # The booking's own status is checked, so a booking cancelled
+            # from anywhere gives its seats back.
+            if booking.is_cancelled():
                 continue
             booked_number = booking.get_flight().get_flight_number()
             if booked_number == flight.get_flight_number():
@@ -117,18 +128,36 @@ class BookingSystem:
     def get_available_flights(self):
         available = []
         for flight in self.__flights.values():
-            if flight.get_status() not in _BOOKABLE_STATUSES:
+            # Flights that won't fly or are already full are skipped.
+            if not flight.is_bookable():
                 continue
-            # skip flights that are already full
             if self.seats_booked(flight) < flight.get_capacity():
                 available.append(flight)
         return available
 
     # ------------------------------------------------------------------
-    # Requests. These are the safe versions used by the program: they
-    # try the core operation, and if it raises a booking error they
-    # report it and return None so the program can carry on.
+    # Requests. These are the safe versions used by the program. Each one
+    # tries a core operation, and if it raises a booking error the error
+    # is reported and None is returned so the program can carry on.
     # ------------------------------------------------------------------
+    def request_add_flight(self, flight):
+        try:
+            self.add_flight(flight)
+        except BookingSystemError as error:
+            self.__report_failure('add flight', error)
+            return None
+        print(f'Added flight {flight.get_flight_number()}')
+        return flight
+
+    def request_register_passenger(self, passenger):
+        try:
+            self.register_passenger(passenger)
+        except BookingSystemError as error:
+            self.__report_failure('register passenger', error)
+            return None
+        print(f'Registered {passenger.get_name()}')
+        return passenger
+
     def request_booking(self, passengers, flight, ticket):
         try:
             new_booking = self.create_booking(passengers, flight, ticket)
@@ -182,7 +211,7 @@ class BookingSystem:
         return list(self.__error_log)
 
     # ------------------------------------------------------------------
-    # Private helpers
+    # Private helpers used by the methods above.
     # ------------------------------------------------------------------
     def __report_failure(self, action, error):
         message = f'Could not {action}: {error}'
@@ -198,21 +227,23 @@ class BookingSystem:
     def __check_bookable(self, flight):
         if not isinstance(flight, Flight):
             raise WrongObjectTypeError('Flight', flight)
-        # get_flight raises if the system doesn't know this flight
+        # This raises if the system doesn't know the flight.
         self.get_flight(flight.get_flight_number())
-        if flight.get_status() not in _BOOKABLE_STATUSES:
+        if not flight.is_bookable():
             raise FlightNotBookableError(flight.get_flight_number(),
                                          flight.get_status())
 
     def __check_seats(self, flight, seats_requested):
-        # make sure the whole group fits, not just one person
+        # The whole group has to fit, not just one person.
         seats_left = flight.get_capacity() - self.seats_booked(flight)
         if seats_requested > seats_left:
             raise FlightFullError(flight.get_flight_number(),
                                   seats_requested, seats_left)
 
     def __str__(self):
+        cancelled = sum(1 for booking in self.__bookings.values()
+                        if booking.is_cancelled())
         return (f'Booking system: {len(self.__flights)} flight(s), '
                 f'{len(self.__passengers)} passenger(s), '
                 f'{len(self.__bookings)} booking(s), '
-                f'{len(self.__cancelled_bookings)} cancelled')
+                f'{cancelled} cancelled')

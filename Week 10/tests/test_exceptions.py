@@ -2,14 +2,17 @@ import pytest
 
 from economy_ticket import EconomyTicket
 from exceptions import (BookingNotFoundError, BookingStateError,
-                        BookingSystemError, DuplicatePassengerError,
-                        EmptyBookingError, FlightFullError,
-                        FlightNotBookableError, FlightNotFoundError,
-                        InvalidBaggageError, InvalidFareError,
-                        InvalidFlightStatusError, InvalidStateError,
+                        BookingSystemError, DuplicateFlightError,
+                        DuplicatePassengerError, EmptyBookingError,
+                        FlightFullError, FlightNotBookableError,
+                        FlightNotFoundError, FlightStatusChangeError,
+                        InvalidBaggageError, InvalidCapacityError,
+                        InvalidFareError, InvalidFlightStatusError,
+                        InvalidPassengerDetailsError, InvalidStateError,
                         InvalidValueError, NotFoundError,
                         ParticipationError, PassengerNotRegisteredError,
                         WrongObjectTypeError)
+from flight import Flight
 from passenger import Passenger
 
 
@@ -21,6 +24,10 @@ class TestExceptionHierarchy:
         (BookingStateError, InvalidStateError),
         (FlightNotBookableError, InvalidStateError),
         (FlightFullError, InvalidStateError),
+        (FlightStatusChangeError, InvalidStateError),
+        (InvalidCapacityError, InvalidValueError),
+        (InvalidPassengerDetailsError, InvalidValueError),
+        (DuplicateFlightError, ParticipationError),
         (InvalidFareError, InvalidValueError),
         (InvalidBaggageError, InvalidValueError),
         (InvalidFlightStatusError, InvalidValueError),
@@ -227,3 +234,59 @@ class TestHandledRequests:
         system.request_cancellation('BK0404')
         system.get_error_log().clear()
         assert len(system.get_error_log()) == 1
+
+
+class TestCancelledSeats:
+    # The booking's own status is the only record of a cancellation, so
+    # cancelling through the booking or the system gives the same result.
+    def test_cancelling_through_the_booking_frees_the_seat(
+            self, system, lui, sam, two_seat_flight, economy_ticket):
+        system.add_flight(two_seat_flight)
+        first = system.create_booking([lui, sam], two_seat_flight,
+                                      economy_ticket)
+        first.cancel_booking()
+        assert system.seats_booked(two_seat_flight) == 0
+        assert '1 cancelled' in str(system)
+        assert system.create_booking(lui, two_seat_flight,
+                                     economy_ticket) is not None
+
+    def test_seats_booked_needs_a_flight(self, system):
+        with pytest.raises(WrongObjectTypeError, match='Expected a Flight'):
+            system.seats_booked('QF401')
+
+
+class TestMoreHandledRequests:
+    def test_none_instead_of_passengers_is_reported(
+            self, system, scheduled_flight, economy_ticket):
+        assert system.request_booking(None, scheduled_flight,
+                                      economy_ticket) is None
+        assert 'Expected a list of Passengers' in system.get_error_log()[0]
+
+    def test_flight_request_adds_a_new_flight(self, empty_system,
+                                              scheduled_flight):
+        assert empty_system.request_add_flight(
+            scheduled_flight) is scheduled_flight
+        assert '1 flight(s)' in str(empty_system)
+
+    def test_duplicate_flight_request_is_reported(self, system):
+        copy = Flight('QF401', 'SYD', 'OOL', '11:00', 10, 'scheduled')
+        assert system.request_add_flight(copy) is None
+        assert system.get_flight('QF401') is not copy
+        assert 'already in the booking system' in system.get_error_log()[0]
+
+    def test_passenger_request_registers_them(self, empty_system, lui):
+        assert empty_system.request_register_passenger(lui) is lui
+        assert '1 passenger(s)' in str(empty_system)
+
+    def test_bad_passenger_request_is_reported(self, empty_system):
+        assert empty_system.request_register_passenger('Lui') is None
+        assert '0 passenger(s)' in str(empty_system)
+        assert 'Expected a Passenger' in empty_system.get_error_log()[0]
+
+    def test_reopening_a_departed_flight_is_reported(self, system,
+                                                     departed_flight):
+        assert system.request_flight_status_change('QF900',
+                                                   'scheduled') is None
+        assert departed_flight.get_status() == 'departed'
+        assert 'cannot be changed to scheduled' in (
+            system.get_error_log()[0])

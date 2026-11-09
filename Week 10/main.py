@@ -18,17 +18,19 @@ sydney_brisbane = Flight('QF500', 'SYD', 'BNE', '12:00', 100, 'cancelled')
 lui = Passenger('Lui', 'lui@email.com', 'PA123456')
 sam = Passenger('Sam', 'sam@email.com', 'PB654321')
 alex = Passenger('Alex', 'alex@email.com', 'PC111222')
-stranger = Passenger('Bob', 'bob@email.com', 'PZ999999')  # not registered
+# Bob is never registered, so his bookings are refused.
+stranger = Passenger('Bob', 'bob@email.com', 'PZ999999')
 
 # Both are Tickets, so Booking can use either one (abstraction and
 # polymorphism from earlier weeks).
 economy = EconomyTicket(250.0, 1)
 business = BusinessTicket(500.0, True, 3)
 
+heading('Setting up the system')
 for flight in (sydney_melbourne, sydney_perth, sydney_brisbane):
-    system.add_flight(flight)
+    system.request_add_flight(flight)
 for passenger in (lui, sam, alex):
-    system.register_passenger(passenger)
+    system.request_register_passenger(passenger)
 
 heading('Normal bookings')
 group = system.request_booking([lui, sam], sydney_melbourne, economy)
@@ -49,6 +51,9 @@ system.request_confirmation('BK0001')
 system.request_cancellation('BK0099')
 system.request_add_passenger('BK0001', lui)
 system.request_flight_status_change('QF643', 'boarding')
+system.request_add_flight(Flight('QF401', 'SYD', 'OOL', '11:00', 50,
+                                 'scheduled'))
+system.request_register_passenger('Bob')
 
 heading('Nothing was changed by the failed requests')
 print(system)
@@ -60,7 +65,7 @@ heading('The program carries on')
 system.request_add_passenger('BK0001', alex)
 print(f'Seats booked on QF401: {system.seats_booked(sydney_melbourne)}')
 system.request_cancellation('BK0001')
-replacement = system.request_booking(lui, sydney_melbourne, economy)
+system.request_booking(lui, sydney_melbourne, economy)
 print('Available flights:')
 for flight in system.get_available_flights():
     print(f'  {flight}')
@@ -68,6 +73,7 @@ for flight in system.get_available_flights():
 heading('Departed flights block cancellation')
 system.request_flight_status_change('QF643', 'departed')
 system.request_cancellation('BK0002')
+system.request_flight_status_change('QF643', 'scheduled')
 print(perth_trip)
 
 heading(f'Error log ({len(system.get_error_log())} handled problems)')

@@ -7,7 +7,7 @@ from ticket import Ticket
 
 class TestBusinessPrice:
     def test_price_includes_paid_bag_and_lounge(self, business_ticket):
-        # 500 fare + 1 paid bag ($35) + lounge ($80).
+        # The $500 fare, plus one paid bag ($35) and the lounge ($80).
         assert business_ticket.calculate_price() == pytest.approx(615.0)
 
     def test_price_without_lounge(self, business_ticket_no_lounge):

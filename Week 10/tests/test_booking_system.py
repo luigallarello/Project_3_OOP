@@ -2,12 +2,13 @@ import datetime
 
 import pytest
 
+from booking import Booking
 from exceptions import (BookingNotFoundError, BookingStateError,
+                        DuplicateFlightError,
                         EmptyBookingError, FlightFullError,
                         FlightNotBookableError, FlightNotFoundError,
                         PassengerNotRegisteredError,
                         WrongObjectTypeError)
-from booking import Booking
 from flight import Flight
 from passenger import Passenger
 
@@ -39,11 +40,15 @@ class TestRegistration:
         empty_system.register_passenger(lui_duplicate)
         assert '1 passenger(s)' in str(empty_system)
 
-    def test_adding_the_same_flight_number_twice_keeps_one_flight(
+    def test_adding_the_same_flight_number_twice_raises(
             self, empty_system, scheduled_flight):
         empty_system.add_flight(scheduled_flight)
-        empty_system.add_flight(Flight('QF401', 'SYD', 'OOL', '11:00', 10,
-                                       'scheduled'))
+        with pytest.raises(DuplicateFlightError) as error:
+            empty_system.add_flight(Flight('QF401', 'SYD', 'OOL', '11:00',
+                                           10, 'scheduled'))
+        assert error.value.flight_number == 'QF401'
+        # The original flight is kept.
+        assert empty_system.get_flight('QF401') is scheduled_flight
         assert '1 flight(s)' in str(empty_system)
 
 

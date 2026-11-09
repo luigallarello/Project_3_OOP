@@ -1,3 +1,9 @@
+import pytest
+
+from exceptions import InvalidPassengerDetailsError
+from passenger import Passenger
+
+
 class TestPassengerEquals:
     def test_same_passport_different_objects_are_equal(self, lui,
                                                        lui_duplicate):
@@ -24,3 +30,17 @@ class TestPassengerString:
         assert 'Lui' in text
         assert 'lui@email.com' in text
         assert 'PA123456' in text
+
+
+class TestPassengerValidation:
+    @pytest.mark.parametrize('field, details', [
+        ('name', ('', 'lui@email.com', 'PA123456')),
+        ('name', ('   ', 'lui@email.com', 'PA123456')),
+        ('email', ('Lui', None, 'PA123456')),
+        ('passport number', ('Lui', 'lui@email.com', 123456)),
+    ])
+    def test_bad_details_are_rejected(self, field, details):
+        with pytest.raises(InvalidPassengerDetailsError) as error:
+            Passenger(*details)
+        assert error.value.field == field
+        assert f'Invalid passenger {field}' in str(error.value)

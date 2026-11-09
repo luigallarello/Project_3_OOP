@@ -42,8 +42,12 @@ This adds custom exceptions. Before this, a broken rule either returned `None`/`
 | Booking a cancelled or departed flight | `BookingSystem.create_booking` | `FlightNotBookableError` | flight number, status |
 | Group is bigger than the seats left | `BookingSystem.create_booking` / `add_passenger_to_booking` | `FlightFullError` | flight number, seats requested, seats left |
 | Negative / non-number fare | `Ticket.set_base_fare` | `InvalidFareError` | the bad fare |
-| Bag count out of range or not a whole number | `BusinessTicket.set_checked_bag_count`, `EconomyTicket.__init__` | `InvalidBaggageError` | ticket type, bad count, max bags |
+| Bag count out of range or not a whole number | `Ticket.set_checked_bag_count` (shared by both ticket types) | `InvalidBaggageError` | ticket type, bad count, max bags |
 | Flight status that doesn't exist (e.g. `'boarding'`) | `Flight.set_status` | `InvalidFlightStatusError` | bad status, list of valid ones |
+| Changing a departed or cancelled flight to another status | `Flight.set_status` | `FlightStatusChangeError` | flight number, current status, new status |
+| Negative or non-whole-number flight capacity | `Flight.__init__` | `InvalidCapacityError` | the bad capacity |
+| Blank or non-text passenger name, email or passport | `Passenger.__init__` | `InvalidPassengerDetailsError` | which detail, the bad value |
+| Adding a flight number that's already in the system | `BookingSystem.add_flight` | `DuplicateFlightError` | flight number |
 | Booking with no passengers | `BookingSystem.create_booking` | `EmptyBookingError` | - |
 | Wrong kind of object passed in (e.g. a string as a passenger) | `add_flight`, `register_passenger`, `create_booking`, `Booking.add_passenger` | `WrongObjectTypeError` | expected type, what was received |
 | Same passenger added to a booking twice | `Booking.add_passenger` | `DuplicatePassengerError` | the passenger, booking reference |
@@ -53,9 +57,10 @@ This adds custom exceptions. Before this, a broken rule either returned `None`/`
 ```
 BookingSystemError(Exception)
 ├── NotFoundError          BookingNotFoundError, FlightNotFoundError, PassengerNotRegisteredError
-├── InvalidStateError      BookingStateError, FlightNotBookableError, FlightFullError
-├── InvalidValueError      InvalidFareError, InvalidBaggageError, InvalidFlightStatusError, EmptyBookingError
-└── ParticipationError     WrongObjectTypeError, DuplicatePassengerError
+├── InvalidStateError      BookingStateError, FlightNotBookableError, FlightFullError, FlightStatusChangeError
+├── InvalidValueError      InvalidFareError, InvalidBaggageError, InvalidFlightStatusError, InvalidCapacityError,
+│                          InvalidPassengerDetailsError, EmptyBookingError
+└── ParticipationError     WrongObjectTypeError, DuplicatePassengerError, DuplicateFlightError
 ```
 
 The four middle classes match the four kinds of problem in the task (doesn't exist, wrong state, bad value, can't take part). One shared parent means the system can catch every booking error with a single `except BookingSystemError`.
@@ -66,7 +71,7 @@ Every check runs before anything is changed, so a failed operation never leaves 
 
 ### Task 4: Handling
 
-`BookingSystem` has `request_booking`, `request_confirmation`, `request_cancellation`, `request_add_passenger` and `request_flight_status_change`. Each one wraps the core operation in `try`/`except BookingSystemError`, prints `Could not <action>: <reason>`, adds the message to an error log (`get_error_log()`), and returns `None` so the program keeps going. `main.py` has no `try`/`except`; it only calls these methods.
+`BookingSystem` has `request_add_flight`, `request_register_passenger`, `request_booking`, `request_confirmation`, `request_cancellation`, `request_add_passenger` and `request_flight_status_change`. Each one wraps the core operation in `try`/`except BookingSystemError`, prints `Could not <action>: <reason>`, adds the message to an error log (`get_error_log()`), and returns `None` so the program keeps going. `main.py` has no `try`/`except`; it only calls these methods.
 
 | Before | Now |
 |---|---|
@@ -75,13 +80,20 @@ Every check runs before anything is changed, so a failed operation never leaves 
 | `confirm_booking` / `cancel_booking` / `add_passenger` returned `False` | raise `BookingStateError` / `DuplicatePassengerError` / `WrongObjectTypeError` |
 | setters printed a message and kept a default | raise `InvalidFareError` / `InvalidBaggageError` / `InvalidFlightStatusError` |
 | `add_flight` / `register_passenger` silently ignored bad objects | raise `WrongObjectTypeError` |
+| adding a flight number twice silently replaced the old flight | raises `DuplicateFlightError` |
+| `Flight` capacity and `Passenger` details weren't checked | raise `InvalidCapacityError` / `InvalidPassengerDetailsError` |
+| a departed flight could be set back to scheduled | raises `FlightStatusChangeError` |
+| cancelled bookings were tracked in a separate `set`, so cancelling through `Booking` didn't free the seat | the booking's own status is the only record (`Booking.is_cancelled()`) |
+| status strings like `'pending'` were typed out in several files | class constants (`Booking.PENDING`, `Flight.DEPARTED`, `Flight.BOOKABLE_STATUSES`) |
+| both ticket types stored and checked bags separately | `Ticket` stores and checks `checked_bag_count`; each type sets `MAX_CHECKED_BAGS` |
+| `Booking.equals` was never used by the program | removed |
 | no safe way to call these from the program | `request_*` methods catch, report and log |
 | adding a passenger to a booking skipped the seat check | `add_passenger_to_booking` checks seats first |
 
 ### Task 5: Testing
 
-Old tests that expected `None`/`False`/printed messages now use `pytest.raises()` and still check the object state is unchanged afterwards. `tests/test_exceptions.py` covers the hierarchy, new lookups, `add_passenger_to_booking`, and the handled `request_*` methods (they return `None`, log the message and leave the system unchanged). 193 tests pass, 100% statement and branch coverage (`coverage_report.txt`).
+Old tests that expected `None`/`False`/printed messages now use `pytest.raises()` and still check the object state is unchanged afterwards. `tests/test_exceptions.py` covers the hierarchy, new lookups, `add_passenger_to_booking`, and the handled `request_*` methods (they return `None`, log the message and leave the system unchanged). 220 tests pass, 100% statement and branch coverage (`coverage_report.txt`).
 
 ### Task 6: Demo
 
-Run `python3 main.py`. It makes normal bookings, triggers nine handled problems, shows nothing changed, then keeps using the system (adds a passenger, cancels, rebooks, lists available flights).
+Run `python3 main.py`. It makes normal bookings, triggers twelve handled problems, shows nothing changed, then keeps using the system (adds a passenger, cancels, rebooks, lists available flights).

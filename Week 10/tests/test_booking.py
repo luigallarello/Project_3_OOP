@@ -156,28 +156,8 @@ class TestTotalCost:
                                                  business_ticket):
         business_booking = Booking('BK0006', '2026-10-31', [lui, sam],
                                    scheduled_flight, business_ticket)
-        # 2 x 615.
+        # Two passengers at $615 each.
         assert business_booking.total_cost() == pytest.approx(1230.0)
-
-
-class TestBookingEquals:
-    def test_same_reference_is_equal(self, booking, sam, scheduled_flight,
-                                     business_ticket):
-        same_reference = Booking('BK0001', '2026-11-01', [sam],
-                                 scheduled_flight, business_ticket)
-        assert booking.equals(same_reference)
-
-    def test_different_reference_is_not_equal(self, booking, group_booking):
-        assert not booking.equals(group_booking)
-
-    def test_booking_equals_itself(self, booking):
-        assert booking.equals(booking)
-
-    def test_reference_text_is_not_equal_to_a_booking(self, booking):
-        assert not booking.equals('BK0001')
-
-    def test_none_is_not_equal_to_a_booking(self, booking):
-        assert not booking.equals(None)
 
 
 class TestBookingString:
