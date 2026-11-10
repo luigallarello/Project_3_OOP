@@ -76,8 +76,8 @@ Writing the tests also meant cleaning up the code:
 | Before | Now | Why |
 |---|---|---|
 | Quick checks under `if __name__ == '__main__':` in the class files | Moved into the pytest suite | The tests do the same job properly and can be rerun at any time |
-| `set_booking_reference`, `get_booking_date`, `get_ticket` in `Booking` | Removed | Nothing in the program used them |
-| Comments like `# list so one booking can cover a group` | Full sentences with a capital and a full stop | PEP 8 and rubric comment style |
+| `set_booking_reference`, `get_booking_date`, `get_ticket` in `Booking` | Removed | Not used anywhere in the program |
+| Comments like `# list so one booking can cover a group` | Full sentences with a capital and a full stop | PEP 8 and proper comments |
 
 Result: 144 tests passing, 100% statement and branch coverage (`coverage_report.txt`).
 
@@ -123,7 +123,7 @@ Each of the four category classes matches one kind of problem that the task outl
 
 ### Task 3: Raising
 
-Every check runs before anything is changed, so a failed operation never leaves an object half-updated. For example `create_booking` checks passengers, ticket, flight and seats before it makes a reference or stores the booking, and the setters raise before storing the new value. 
+Every check runs before anything is changed, so an object is never left half-updated after an operation fails. For example `create_booking` checks passengers, ticket, flight and seats before it makes a reference or stores the booking, and the setters raise before storing the new value. 
 
 Constructors use the setters, so an invalid `Flight` or `Ticket` is never created. Successful calls still return normally (`True`, the booking, etc.).
 
