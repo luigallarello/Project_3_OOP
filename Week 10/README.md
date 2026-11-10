@@ -16,9 +16,9 @@ Today the `Passenger` class was written, and `Flight` was laid out straight afte
 | `email` | `str` | private |
 | `passport_number` | `str` | private, `get_passport_number()` |
 
-`equals()` defines value equality for `Passenger`. Two objects are the same passenger if their passport numbers match, even if they are separate objects in memory. A passport number is unique to a person, so it's a better identity check than comparing names or object identity.
+Through testing, I discovered that two passenger objects can be the same person. I implemented `equals()` which compares passport numbers to see if two passenger objects are the same. Booking.add_passenger() uses it to block duplicates. Essentially, two objects become the same if their passport numbers match, even if they are separate objects in memory. A passport number is unique to a person, so it's a better identity check than comparing names or object identity.
 
-Since then: the setters were removed because nothing changes a passenger's details after they're created, and on 06/11 the constructor started checking that every detail is non-blank text.
+Since then: the setters were removed because nothing changes a passenger's details after they're created. I decided this would be a feature for a few reasons but the main reason being is that they were unsused code. Beginning from 06/11, the constructor started handling all of the validation.
 
 28/10 Workshop 9-1: Code review with Billy
 
@@ -28,9 +28,12 @@ Billy went through my UML design and all of my proposed methods.
 
 |---|---|
 
-| Dunder and magic methods (`__init__`, `__str__`) don't need to go in the UML | They're Python mechanics, not part of the design, and they clutter the diagram |
-| A booking should be able to hold multiple passengers, but mine only stored one | A real booking often covers a family or group on the same flight |
+| Dunder and magic methods (`__init__`, `__str__`) don't need to go in the UML | They're just python mechanics and create clutter in the diagram. |
+
+| A booking should be able to hold multiple passengers, but mine only stored one | A real booking often might cover a family or a couple going on a holiday. |
+
 | The Passenger -> BookingSystem relationship was wrong | The system keeps passengers it didn't create, so it's aggregation |
+
 | The BookingSystem -> Booking relationship was wrong | The booking system creates and owns each booking, so it's composition, not aggregation |
 
 29/10: Implementing the code review
