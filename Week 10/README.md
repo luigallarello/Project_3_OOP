@@ -9,41 +9,32 @@ Today the `Passenger` class was written, and `Flight` was laid out straight afte
 ### Passenger
 
 | Attribute | Type | Access |
-
 |---|---|---|
-
 | `name` | `str` | private, `get_name()` |
 | `email` | `str` | private |
 | `passport_number` | `str` | private, `get_passport_number()` |
 
-Through testing, I discovered that two passenger objects can be the same person. I implemented `equals()` which compares passport numbers to see if two passenger objects are the same. Booking.add_passenger() uses it to block duplicates. Essentially, two objects become the same if their passport numbers match, even if they are separate objects in memory. A passport number is unique to a person, so it's a better identity check than comparing names or object identity.
+While designing passenger, I realised that two passenger objects can be the same person. I implemented `equals()` which compares passport numbers to see if two passenger objects are the same. Booking.add_passenger() uses it to block duplicates. Essentially, two objects are treated as the same if their passport numbers match, even if they are separate objects in memory. A passport number is unique to a person, so it's a better identity check than comparing names or object identity.
 
-Since then: the setters were removed because nothing changes a passenger's details after they're created. I decided this would be a feature for a few reasons but the main reason being is that they were unsused code. Beginning from 06/11, the constructor started handling all of the validation.
+Since then: the setters were removed because nothing changes a passenger's details after they're created. I decided they were unused code and a passenger's passport shouldn't change once it's their ID (01/11). Beginning from 06/11, the constructor started handling all of the validation.
 
 28/10 Workshop 9-1: Code review with Billy
 
 Billy went through my UML design and all of my proposed methods.
 
 | Feedback | Why it matters |
-
 |---|---|
-
 | Dunder and magic methods (`__init__`, `__str__`) don't need to go in the UML | They're just python mechanics and create clutter in the diagram. |
-
 | A booking should be able to hold multiple passengers, but mine only stored one | A real booking often might cover a family or a couple going on a holiday. |
-
 | The Passenger -> BookingSystem relationship was wrong | The system keeps passengers it didn't create, so it's aggregation |
-
 | The BookingSystem -> Booking relationship was wrong | The booking system creates and owns each booking, so it's composition, not aggregation |
 
 29/10: Implementing the code review
 
-Implemented Billy's changes from workshop 9-1. One booking can now hold a whole group of passengers.
+Implemented Billy's changes from workshop 9-1. One booking can now hold a whole group of passengers. I learned that returning a copy of a list protects encapsulation, because outside code can't add passengers without going through the duplicate check.
 
 | | Before | Now |
-
 |---|---|---|
-
 | Booking attribute | `passenger: Passenger` | `passengers: list[Passenger]` |
 | Booking constructor | `Booking(booking_reference, booking_date, passenger, flight, ticket)` | `Booking(booking_reference, booking_date, passengers, flight, ticket)` |
 | Getting passengers | `get_passenger()` returns one Passenger | `get_passengers()` returns a copy of the list |
@@ -55,11 +46,11 @@ Implemented Billy's changes from workshop 9-1. One booking can now hold a whole 
 
 ### Why a list
 
-A list keeps passengers in the order they were booked and makes it easy to count seats (`len()`) and add someone later. `get_passengers()` returns a copy so code outside `Booking` can't change the group without going through `add_passenger()`, which checks for duplicates.
+I used a list because they have the ability to keep passengers in the order they were booked, makes it easy to count seats (`len()`) and add another passenger later. `get_passengers()` returns a copy so code outside `Booking` can't change the group without going through `add_passenger()`, which checks for duplicates.
 
 ### Why the seat check counts the whole group
 
-Once a booking can hold several people, checking one seat isn't enough. `create_booking` now refuses the booking unless every passenger in the group fits.
+Considering a booking can now hold multiple people, everyone needs to be able to fit. `create_booking` now refuses the booking unless every passenger in the group fits.
 
 31/10: PEP 8 and Week 10 folder
 
@@ -70,9 +61,7 @@ The Week 9 code was run through PEP 8 checks and a short demo was added to `main
 A pytest suite was written for every class.
 
 | File | What it tests |
-
 |---|---|
-
 | `tests/conftest.py` | Shared fixtures: three passengers plus a duplicate, one flight for each status plus small-capacity flights, both ticket types, ready-made bookings, and an empty and a filled booking system |
 | `test_passenger.py` | Passport-based equality and the string output |
 | `test_flight.py` | Valid and invalid statuses and the string output |
@@ -85,9 +74,7 @@ A pytest suite was written for every class.
 Writing the tests also meant cleaning up the code:
 
 | Before | Now | Why |
-
 |---|---|---|
-
 | Quick checks under `if __name__ == '__main__':` in the class files | Moved into the pytest suite | The tests do the same job properly and can be rerun at any time |
 | `set_booking_reference`, `get_booking_date`, `get_ticket` in `Booking` | Removed | Nothing in the program used them |
 | Comments like `# list so one booking can cover a group` | Full sentences with a capital and a full stop | PEP 8 and rubric comment style |
@@ -96,7 +83,7 @@ Result: 144 tests passing, 100% statement and branch coverage (`coverage_report.
 
 06/11: Exception handling
 
-Today custom exceptions were added. Before this, a broken rule either returned `None`/`False` or printed a message and carried on, so the caller couldn't tell why something failed. Now the method that owns each rule raises a custom exception, and `BookingSystem` catches and reports it. Task 1 contains a list of all exceptions that were created. Wasn't able to get a code review this week.
+Today custom exceptions were added. Before this, a broken rule either returned `None`/`False` or printed a message and carried on, so the caller couldn't tell why something failed. Now the method that owns each rule raises a custom exception, and `BookingSystem` catches and reports it. Task 1 contains a list of all exceptions that were created. I unfortunately wasn't able to get a code review this week. This week I learnt that an exception can carry the reason something may have failed, where returning None loses that information, and that checking everything before anything is changed keeps objects valid.
 
 ### Task 1: Exceptional situations
 
@@ -132,7 +119,7 @@ BookingSystemError(Exception)
 └── ParticipationError     WrongObjectTypeError, DuplicatePassengerError, DuplicateFlightError
 ```
 
-The four middle classes match the four kinds of problem in the task (doesn't exist, wrong state, bad value, can't take part). One shared parent means the system can catch every booking error with a single `except BookingSystemError`.
+Each of the four category classes matches one kind of problem that the task outlines (doesn't exist, wrong state, bad value, can't take part). One shared parent means the system can catch every booking error with a single `except BookingSystemError`.
 
 ### Task 3: Raising
 
@@ -167,4 +154,4 @@ Old tests that expected `None`/`False`/printed messages now use `pytest.raises()
 
 ### Task 6: Demo
 
-Finally a demo was created under the name of `python3 main.py`. It makes normal bookings, triggers twelve handled problems, shows nothing changed, then keeps using the system (adds a passenger, cancels, rebooks, lists available flights).
+Finally a demo was created under the name of `main.py`. It makes normal bookings, triggers twelve handled problems, shows nothing changed, then keeps using the system (adds a passenger, cancels, rebooks, lists available flights).
