@@ -1,5 +1,6 @@
 import pytest
 
+from business_ticket import BusinessTicket
 from economy_ticket import EconomyTicket
 from exceptions import (BookingNotFoundError, BookingStateError,
                         BookingSystemError, DuplicateFlightError,
@@ -290,3 +291,65 @@ class TestMoreHandledRequests:
         assert departed_flight.get_status() == 'departed'
         assert 'cannot be changed to scheduled' in (
             system.get_error_log()[0])
+
+
+class TestCreationRequests:
+    # Objects built through the system are checked by their constructors.
+    # A bad value is reported and None is returned instead of a crash.
+    def test_valid_flight_is_created(self, empty_system):
+        flight = empty_system.request_new_flight('QF1', 'SYD', 'MEL',
+                                                 '10:00', 100, 'scheduled')
+        assert isinstance(flight, Flight)
+        assert flight.get_flight_number() == 'QF1'
+        assert empty_system.get_error_log() == []
+
+    def test_bad_capacity_is_reported(self, empty_system):
+        assert empty_system.request_new_flight('QF1', 'SYD', 'MEL', '10:00',
+                                               -5, 'scheduled') is None
+        assert 'Could not create flight: Invalid capacity: -5' in (
+            empty_system.get_error_log()[0])
+
+    def test_bad_starting_status_is_reported(self, empty_system):
+        assert empty_system.request_new_flight('QF1', 'SYD', 'MEL', '10:00',
+                                               100, 'boarding') is None
+        assert "'boarding'" in empty_system.get_error_log()[0]
+
+    def test_valid_passenger_is_created(self, empty_system):
+        passenger = empty_system.request_new_passenger('Lui',
+                                                       'lui@email.com',
+                                                       'PA123456')
+        assert passenger.get_passport_number() == 'PA123456'
+
+    def test_blank_passenger_name_is_reported(self, empty_system):
+        assert empty_system.request_new_passenger('', 'lui@email.com',
+                                                  'PA123456') is None
+        assert 'Invalid passenger name' in empty_system.get_error_log()[0]
+
+    def test_valid_economy_ticket_is_created(self, empty_system):
+        ticket = empty_system.request_new_economy_ticket(250.0, 1)
+        assert isinstance(ticket, EconomyTicket)
+        assert ticket.calculate_price() == pytest.approx(285.0)
+
+    def test_negative_fare_is_reported(self, empty_system):
+        assert empty_system.request_new_economy_ticket(-20.0, 1) is None
+        assert 'Could not create economy ticket' in (
+            empty_system.get_error_log()[0])
+
+    def test_valid_business_ticket_is_created(self, empty_system):
+        ticket = empty_system.request_new_business_ticket(500.0, True, 3)
+        assert isinstance(ticket, BusinessTicket)
+        assert ticket.calculate_price() == pytest.approx(615.0)
+
+    def test_too_many_business_bags_is_reported(self, empty_system):
+        assert empty_system.request_new_business_ticket(500.0, False,
+                                                        6) is None
+        assert 'Business only allows 0-4' in empty_system.get_error_log()[0]
+
+    def test_failed_creation_can_be_passed_on_safely(self, empty_system):
+        # A None from a failed creation is caught again further along, so
+        # the program still never crashes.
+        flight = empty_system.request_new_flight('QF1', 'SYD', 'MEL',
+                                                 '10:00', -1, 'scheduled')
+        assert empty_system.request_add_flight(flight) is None
+        assert '0 flight(s)' in str(empty_system)
+        assert len(empty_system.get_error_log()) == 2

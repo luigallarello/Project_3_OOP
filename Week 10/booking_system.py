@@ -1,6 +1,8 @@
 import datetime
 
 from booking import Booking
+from business_ticket import BusinessTicket
+from economy_ticket import EconomyTicket
 from exceptions import (BookingNotFoundError, BookingSystemError,
                         DuplicateFlightError, EmptyBookingError,
                         FlightFullError, FlightNotBookableError,
@@ -140,6 +142,48 @@ class BookingSystem:
     # tries a core operation, and if it raises a booking error the error
     # is reported and None is returned so the program can carry on.
     # ------------------------------------------------------------------
+    def request_new_flight(self, flight_number, origin, destination,
+                           departure_time, capacity, status):
+        # The Flight constructor raises if the capacity or status is
+        # invalid, so the program never holds a broken flight.
+        try:
+            flight = Flight(flight_number, origin, destination,
+                            departure_time, capacity, status)
+        except BookingSystemError as error:
+            self.__report_failure('create flight', error)
+            return None
+        print(f'Created flight {flight_number}')
+        return flight
+
+    def request_new_passenger(self, name, email, passport_number):
+        try:
+            passenger = Passenger(name, email, passport_number)
+        except BookingSystemError as error:
+            self.__report_failure('create passenger', error)
+            return None
+        print(f'Created passenger {name}')
+        return passenger
+
+    def request_new_economy_ticket(self, base_fare, checked_bag_count):
+        try:
+            ticket = EconomyTicket(base_fare, checked_bag_count)
+        except BookingSystemError as error:
+            self.__report_failure('create economy ticket', error)
+            return None
+        print(f'Created {ticket}')
+        return ticket
+
+    def request_new_business_ticket(self, base_fare, lounge_access,
+                                    checked_bag_count):
+        try:
+            ticket = BusinessTicket(base_fare, lounge_access,
+                                    checked_bag_count)
+        except BookingSystemError as error:
+            self.__report_failure('create business ticket', error)
+            return None
+        print(f'Created {ticket}')
+        return ticket
+
     def request_add_flight(self, flight):
         try:
             self.add_flight(flight)

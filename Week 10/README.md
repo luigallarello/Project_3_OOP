@@ -129,7 +129,7 @@ Constructors use the setters, so an invalid `Flight` or `Ticket` is never create
 
 ### Task 4: Handling
 
-`BookingSystem` has `request_add_flight`, `request_register_passenger`, `request_booking`, `request_confirmation`, `request_cancellation`, `request_add_passenger` and `request_flight_status_change`. Each one wraps the core operation in `try`/`except BookingSystemError`, prints `Could not <action>: <reason>`, adds the message to an error log (`get_error_log()`), and returns `None` so the program keeps going. `main.py` has no `try`/`except`; it only calls these methods.
+`BookingSystem` has `request_new_flight`, `request_new_passenger`, `request_new_economy_ticket`, `request_new_business_ticket`, `request_add_flight`, `request_register_passenger`, `request_booking`, `request_confirmation`, `request_cancellation`, `request_add_passenger` and `request_flight_status_change`. Each one wraps the core operation in `try`/`except BookingSystemError`, prints `Could not <action>: <reason>`, adds the message to an error log (`get_error_log()`), and returns `None` so the program keeps going. `main.py` has no `try`/`except`; it only calls these methods.
 
 | Before | Now |
 |---|---|
@@ -146,12 +146,13 @@ Constructors use the setters, so an invalid `Flight` or `Ticket` is never create
 | both ticket types stored and checked bags separately | `Ticket` stores and checks `checked_bag_count`; each type sets `MAX_CHECKED_BAGS` |
 | `Booking.equals` was never used by the program | removed |
 | no safe way to call these from the program | `request_*` methods catch, report and log |
+| `main.py` built flights, passengers and tickets directly, so a bad value would crash it | `request_new_*` methods build them inside `try`/`except`, so every raised exception is handled |
 | adding a passenger to a booking skipped the seat check | `add_passenger_to_booking` checks seats first |
 
 ### Task 5: Testing
 
-Old tests that expected `None`/`False`/printed messages now use `pytest.raises()` and still check the object state is unchanged afterwards. `tests/test_exceptions.py` covers the hierarchy, new lookups, `add_passenger_to_booking`, and the handled `request_*` methods (they return `None`, log the message and leave the system unchanged). 220 tests pass, 100% statement and branch coverage (`coverage_report.txt`).
+Old tests that expected `None`/`False`/printed messages now use `pytest.raises()` and still check the object state is unchanged afterwards. `tests/test_exceptions.py` covers the hierarchy, new lookups, `add_passenger_to_booking`, and the handled `request_*` methods (they return `None`, log the message and leave the system unchanged). 230 tests pass, 100% statement and branch coverage (`coverage_report.txt`).
 
 ### Task 6: Demo
 
-Finally a demo was created under the name of `main.py`. It makes normal bookings, triggers twelve handled problems, shows nothing changed, then keeps using the system (adds a passenger, cancels, rebooks, lists available flights).
+Finally a demo was created under the name of `main.py`. It makes normal bookings, triggers sixteen handled problems, shows nothing changed, then keeps using the system (adds a passenger, cancels, rebooks, lists available flights).

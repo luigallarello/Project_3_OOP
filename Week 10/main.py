@@ -1,8 +1,4 @@
 from booking_system import BookingSystem
-from business_ticket import BusinessTicket
-from economy_ticket import EconomyTicket
-from flight import Flight
-from passenger import Passenger
 
 
 def heading(title):
@@ -11,20 +7,26 @@ def heading(title):
 
 system = BookingSystem()
 
-sydney_melbourne = Flight('QF401', 'SYD', 'MEL', '10:00', 3, 'scheduled')
-sydney_perth = Flight('QF643', 'SYD', 'PER', '15:30', 150, 'delayed')
-sydney_brisbane = Flight('QF500', 'SYD', 'BNE', '12:00', 100, 'cancelled')
+# Every object is created through the system, so a bad value is caught
+# and reported instead of stopping the program.
+heading('Creating flights, passengers and tickets')
+sydney_melbourne = system.request_new_flight('QF401', 'SYD', 'MEL', '10:00',
+                                             3, 'scheduled')
+sydney_perth = system.request_new_flight('QF643', 'SYD', 'PER', '15:30', 150,
+                                         'delayed')
+sydney_brisbane = system.request_new_flight('QF500', 'SYD', 'BNE', '12:00',
+                                            100, 'cancelled')
 
-lui = Passenger('Lui', 'lui@email.com', 'PA123456')
-sam = Passenger('Sam', 'sam@email.com', 'PB654321')
-alex = Passenger('Alex', 'alex@email.com', 'PC111222')
+lui = system.request_new_passenger('Lui', 'lui@email.com', 'PA123456')
+sam = system.request_new_passenger('Sam', 'sam@email.com', 'PB654321')
+alex = system.request_new_passenger('Alex', 'alex@email.com', 'PC111222')
 # Bob is never registered, so his bookings are refused.
-stranger = Passenger('Bob', 'bob@email.com', 'PZ999999')
+stranger = system.request_new_passenger('Bob', 'bob@email.com', 'PZ999999')
 
 # Both are Tickets, so Booking can use either one (abstraction and
 # polymorphism from earlier weeks).
-economy = EconomyTicket(250.0, 1)
-business = BusinessTicket(500.0, True, 3)
+economy = system.request_new_economy_ticket(250.0, 1)
+business = system.request_new_business_ticket(500.0, True, 3)
 
 heading('Setting up the system')
 for flight in (sydney_melbourne, sydney_perth, sydney_brisbane):
@@ -43,6 +45,10 @@ print(system)
 heading('Problems the system catches')
 # Each of these raises a custom exception inside BookingSystem. The
 # system handles it, prints why it failed and returns None.
+system.request_new_flight('QF777', 'SYD', 'HBA', '18:00', -5, 'scheduled')
+system.request_new_passenger('', 'nobody@email.com', 'PX000000')
+system.request_new_economy_ticket(-20.0, 1)
+system.request_new_business_ticket(500.0, False, 6)
 system.request_booking(stranger, sydney_melbourne, economy)
 system.request_booking(lui, sydney_brisbane, economy)
 system.request_booking([alex, lui], sydney_melbourne, economy)
@@ -51,8 +57,9 @@ system.request_confirmation('BK0001')
 system.request_cancellation('BK0099')
 system.request_add_passenger('BK0001', lui)
 system.request_flight_status_change('QF643', 'boarding')
-system.request_add_flight(Flight('QF401', 'SYD', 'OOL', '11:00', 50,
-                                 'scheduled'))
+gold_coast = system.request_new_flight('QF401', 'SYD', 'OOL', '11:00', 50,
+                                       'scheduled')
+system.request_add_flight(gold_coast)
 system.request_register_passenger('Bob')
 
 heading('Nothing was changed by the failed requests')
